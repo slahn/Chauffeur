@@ -13,9 +13,6 @@ using Umbraco.Core.Persistence.DatabaseModelDefinitions;
 using Umbraco.Core.Persistence.SqlSyntax;
 using Xunit;
 
-#if false
-    Temporarily disabled because of database API changes
-
 namespace Chauffeur.Tests.Deliverables
 {
 
@@ -27,15 +24,16 @@ namespace Chauffeur.Tests.Deliverables
             var provider = Substitute.For<ISqlSyntaxProvider>();
             provider.Format(Arg.Any<ICollection<ForeignKeyDefinition>>()).Returns(new List<string>());
             provider.Format(Arg.Any<ICollection<IndexDefinition>>()).Returns(new List<string>());
-            provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(false);
-            
-
+            provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(false);                     
+          
             var conn = Substitute.For<IDbConnection>();
             var db = new Database(conn);
+            var logger = Substitute.For<Umbraco.Core.Logging.ILogger>();
+            var helper = new DatabaseSchemaHelper(db, logger, provider);
 
             var settings = Substitute.For<IChauffeurSettings>();
 
-            var deliverable = new DeliveryDeliverable(null, new MockTextWriter(), db, settings, null, null);
+            var deliverable = new DeliveryDeliverable(null, new MockTextWriter(), db, helper, provider, settings, null, null);
 
             await deliverable.Run(null, new string[0]);
 
@@ -48,8 +46,6 @@ namespace Chauffeur.Tests.Deliverables
             var provider = Substitute.For<ISqlSyntaxProvider>();
             provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(true);
 
-            SqlSyntaxContext.SqlSyntaxProvider = provider;
-
             var settings = Substitute.For<IChauffeurSettings>();
             string s;
             settings.TryGetChauffeurDirectory(out s).Returns(x =>
@@ -60,6 +56,8 @@ namespace Chauffeur.Tests.Deliverables
 
             var conn = Substitute.For<IDbConnection>();
             var db = new Database(conn);
+            var logger = Substitute.For<Umbraco.Core.Logging.ILogger>();
+            var helper = new DatabaseSchemaHelper(db, logger, provider);
 
             var writer = new MockTextWriter();
 
@@ -68,7 +66,7 @@ namespace Chauffeur.Tests.Deliverables
                 {@"c:\foo\bar.txt", new MockFileData("This is not a deliverable")}
             });
 
-            var deliverable = new DeliveryDeliverable(null, writer, db, settings, fs, null);
+            var deliverable = new DeliveryDeliverable(null, writer, db, helper, provider, settings, fs, null);
 
             await deliverable.Run(null, new string[0]);
 
@@ -79,9 +77,7 @@ namespace Chauffeur.Tests.Deliverables
         public async Task FoundDeliveryNotPreviouslyRun_WillBeGivenToTheHost()
         {
             var provider = Substitute.For<ISqlSyntaxProvider>();
-            provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(true);
-
-            SqlSyntaxContext.SqlSyntaxProvider = provider;
+            provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(true);                        
 
             var settings = Substitute.For<IChauffeurSettings>();
             string s;
@@ -96,6 +92,9 @@ namespace Chauffeur.Tests.Deliverables
             var conn = Substitute.For<IDbConnection>();
             conn.CreateCommand().Returns(cmd);
             var db = new Database(conn);
+            var logger = Substitute.For<Umbraco.Core.Logging.ILogger>();
+            var helper = new DatabaseSchemaHelper(db, logger, provider);
+
 
             var writer = new MockTextWriter();
 
@@ -108,7 +107,7 @@ namespace Chauffeur.Tests.Deliverables
             var host = Substitute.For<IChauffeurHost>();
             host.Run(Arg.Any<string[]>()).Returns(Task.FromResult(DeliverableResponse.Continue));
 
-            var deliverable = new DeliveryDeliverable(null, writer, db, settings, fs, host);
+            var deliverable = new DeliveryDeliverable(null, writer, db, helper, provider, settings, fs, host);
 
             await deliverable.Run(null, new string[0]);
 
@@ -119,9 +118,7 @@ namespace Chauffeur.Tests.Deliverables
         public async Task FoundDeliveryPreviouslyRun_WillBeSkipped()
         {
             var provider = Substitute.For<ISqlSyntaxProvider>();
-            provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(true);
-
-            SqlSyntaxContext.SqlSyntaxProvider = provider;
+            provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(true);                        
 
             var settings = Substitute.For<IChauffeurSettings>();
             string s;
@@ -147,6 +144,9 @@ namespace Chauffeur.Tests.Deliverables
             var conn = Substitute.For<IDbConnection>();
             conn.CreateCommand().Returns(cmd);
             var db = new Database(conn);
+            var logger = Substitute.For<Umbraco.Core.Logging.ILogger>();
+            var helper = new DatabaseSchemaHelper(db, logger, provider);
+
 
             var writer = new MockTextWriter();
 
@@ -159,7 +159,7 @@ namespace Chauffeur.Tests.Deliverables
             var host = Substitute.For<IChauffeurHost>();
             host.Run(Arg.Any<string[]>()).Returns(Task.FromResult(DeliverableResponse.Continue));
 
-            var deliverable = new DeliveryDeliverable(null, writer, db, settings, fs, host);
+            var deliverable = new DeliveryDeliverable(null, writer, db, helper, provider, settings, fs, host);
 
             await deliverable.Run(null, new string[0]);
 
@@ -175,14 +175,16 @@ namespace Chauffeur.Tests.Deliverables
             provider.Format(Arg.Any<ICollection<ForeignKeyDefinition>>()).Returns(new List<string>());
             provider.Format(Arg.Any<ICollection<IndexDefinition>>()).Returns(new List<string>());
             provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(_ => { throw ex; }, _ => true);
-
-            SqlSyntaxContext.SqlSyntaxProvider = provider;
+                        
 
             var conn = Substitute.For<IDbConnection>();
             var cmd = Substitute.For<IDbCommand>();
             cmd.ExecuteScalar().Returns(1);
             conn.CreateCommand().Returns(cmd);
             var db = new Database(conn);
+            var logger = Substitute.For<Umbraco.Core.Logging.ILogger>();
+            var helper = new DatabaseSchemaHelper(db, logger, provider);
+
 
             var settings = Substitute.For<IChauffeurSettings>();
             string s;
@@ -202,7 +204,7 @@ namespace Chauffeur.Tests.Deliverables
             var host = Substitute.For<IChauffeurHost>();
             host.Run(Arg.Any<string[]>()).Returns(Task.FromResult(DeliverableResponse.Continue));
 
-            var deliverable = new DeliveryDeliverable(null, writer, db, settings, fs, host);
+            var deliverable = new DeliveryDeliverable(null, writer, db, helper, provider, settings, fs, host);
 
             await deliverable.Run(null, new string[0]);
 
@@ -214,9 +216,7 @@ namespace Chauffeur.Tests.Deliverables
         {
             var provider = Substitute.For<ISqlSyntaxProvider>();
             provider.DoesTableExist(Arg.Any<Database>(), Arg.Any<string>()).Returns(true);
-
-            SqlSyntaxContext.SqlSyntaxProvider = provider;
-
+            
             var settings = Substitute.For<IChauffeurSettings>();
             string s;
             settings.TryGetChauffeurDirectory(out s).Returns(x =>
@@ -230,6 +230,9 @@ namespace Chauffeur.Tests.Deliverables
             var conn = Substitute.For<IDbConnection>();
             conn.CreateCommand().Returns(cmd);
             var db = new Database(conn);
+            var logger = Substitute.For<Umbraco.Core.Logging.ILogger>();
+            var helper = new DatabaseSchemaHelper(db, logger, provider);
+
 
             var writer = new MockTextWriter();
 
@@ -242,7 +245,7 @@ namespace Chauffeur.Tests.Deliverables
             var host = Substitute.For<IChauffeurHost>();
             host.Run(Arg.Any<string[]>()).Returns(Task.FromResult(DeliverableResponse.Continue));
 
-            var deliverable = new DeliveryDeliverable(null, writer, db, settings, fs, host);
+            var deliverable = new DeliveryDeliverable(null, writer, db, helper, provider, settings, fs, host);
 
             await deliverable.Run(null, new[] { "-p:bar=baz" });
 
@@ -252,5 +255,3 @@ namespace Chauffeur.Tests.Deliverables
         }
     }
 }
-
-#endif
