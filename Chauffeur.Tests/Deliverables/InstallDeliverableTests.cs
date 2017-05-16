@@ -14,8 +14,8 @@ namespace Chauffeur.Tests.Deliverables
         {
             var writer = new MockTextWriter();
             var settings = Substitute.For<IChauffeurSettings>();
-            var deliverable = new InstallDeliverable(null, writer, null, settings, null, null);
-
+            var deliverable = new InstallDeliverable(null, writer, null, null, settings, null, null);
+            
             await deliverable.Run(null, null);
 
             Assert.Equal(writer.Messages.Count(), 1);
