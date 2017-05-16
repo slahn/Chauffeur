@@ -65,9 +65,19 @@ namespace Chauffeur
                 ResolutionType = ResolutionType.Reflection
             };
 
-            instanceDependencyMap.Add(typeof(TAs), reg);
+            AddRegistration(typeof(TAs), reg);
 
             return new ShittyRegistrationBuilder(reg, this);
+        }
+
+        private void AddRegistration(object key, ShittyRegistration reg)
+        {
+            if(instanceDependencyMap.ContainsKey(key))
+            {
+                throw new Exception($"Can't register dependency '{key}': Duplicate, already registered as {instanceDependencyMap[key].ResolutionType}");
+            }
+
+            instanceDependencyMap.Add(key, reg);
         }
 
         public IRegistrationBuilder Register<T>() where T : class
@@ -96,8 +106,8 @@ namespace Chauffeur
                 Factory = (Func<object>)factory
             };
 
-            instanceDependencyMap.Add(typeof(T), reg);
-
+            AddRegistration(typeof(T), reg);
+            
             return new ShittyRegistrationBuilder(reg, this);
         }
 
@@ -110,11 +120,11 @@ namespace Chauffeur
             };
 
             var name = deliverable.GetCustomAttribute<DeliverableNameAttribute>();
-            instanceDependencyMap.Add(name.Name, registration);
+            AddRegistration(name.Name, registration);
 
             var aliases = deliverable.GetCustomAttributes<DeliverableAliasAttribute>();
             foreach (var alias in aliases)
-                instanceDependencyMap.Add(alias.Alias, registration);
+                AddRegistration(alias.Alias, registration);
         }
 
         public Deliverable ResolveDeliverableByName(string command)
@@ -199,7 +209,7 @@ namespace Chauffeur
 
         internal void Register<T>(ShittyRegistration registration)
         {
-            instanceDependencyMap.Add(typeof(T), registration);
+            AddRegistration(typeof(T), registration);            
         }
     }
 

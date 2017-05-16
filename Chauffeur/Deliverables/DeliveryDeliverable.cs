@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Umbraco.Core.Persistence;
 using Umbraco.Core.Persistence.DatabaseAnnotations;
+using Umbraco.Core.Persistence.SqlSyntax;
 
 namespace Chauffeur.Deliverables
 {
@@ -28,11 +29,15 @@ namespace Chauffeur.Deliverables
         private readonly IChauffeurHost host;
 
         public const string TableName = "Chauffeur_Delivery";
+        private DatabaseSchemaHelper schemaHelper;
+        private ISqlSyntaxProvider syntaxProvider;
 
         public DeliveryDeliverable(
             TextReader reader,
             TextWriter writer,
             Database database,
+            DatabaseSchemaHelper schemaHelper,
+            ISqlSyntaxProvider syntaxProvider,
             IChauffeurSettings settings,
             IFileSystem fileSystem,
             IChauffeurHost host
@@ -40,6 +45,8 @@ namespace Chauffeur.Deliverables
             : base(reader, writer)
         {
             this.database = database;
+            this.schemaHelper = schemaHelper;
+            this.syntaxProvider = syntaxProvider;
             this.settings = settings;
             this.fileSystem = fileSystem;
             this.host = host;
@@ -49,8 +56,8 @@ namespace Chauffeur.Deliverables
         {
             var dbNotReady = false;
             try
-            {
-                if (!database.TableExist(TableName))
+            {                        
+                if (!syntaxProvider.DoesTableExist(database, TableName))
                 {
                     if (!await SetupDatabase())
                         return DeliverableResponse.FinishedWithError;
@@ -121,13 +128,13 @@ namespace Chauffeur.Deliverables
             foreach (var delivery in allDeliveries)
             {
                 var file = fileSystem.FileInfo.FromFileName(delivery);
-
+                                
                 var sql = new Sql()
-                    .From<ChauffeurDeliveryTable>()
-                    .Where<ChauffeurDeliveryTable>(t => t.Name == file.Name);
+                    .From<ChauffeurDeliveryTable>(syntaxProvider)
+                    .Where<ChauffeurDeliveryTable>(t => t.Name == file.Name, syntaxProvider);
 
                 var entry = database.Fetch<ChauffeurDeliveryTable>(sql).FirstOrDefault();
-
+                
                 if (entry != null && entry.SignedFor)
                 {
                     await Out.WriteLineFormattedAsync("'{0}' is already signed for, skipping it.", file.Name);
@@ -172,8 +179,8 @@ namespace Chauffeur.Deliverables
             await Out.WriteLineAsync("Chauffeur Delivery does not have its database setup. Setting up now.");
 
             try
-            {
-                database.CreateTable<ChauffeurDeliveryTable>(true);
+            {                
+                schemaHelper.CreateTable<ChauffeurDeliveryTable>(true);
             }
             catch (Exception ex)
             {
